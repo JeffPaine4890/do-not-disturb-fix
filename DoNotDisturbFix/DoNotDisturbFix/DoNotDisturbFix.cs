@@ -91,7 +91,7 @@ namespace DoNotDisturbFix
                             // If this window shows up in our blacklist, then we'll pretend it doesn't exist
                             for (int i = 0; i < blacklist.Length; i += 2)
                             {
-                                if (blacklist[i] == Process.GetProcessById((int)processId).ProcessName.ToString() && blacklist[i + 1] == windowText.ToString())
+                                if (blacklist[i] == "ApplicationFrameHost" || blacklist[i] == Process.GetProcessById((int)processId).ProcessName.ToString() && blacklist[i + 1] == windowText.ToString())
                                 {
                                     return true;
                                 }
