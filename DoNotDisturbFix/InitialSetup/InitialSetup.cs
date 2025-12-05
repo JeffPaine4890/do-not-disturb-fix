@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace InitialSetup
@@ -24,7 +23,6 @@ namespace InitialSetup
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
-        const ulong WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED = 0x0D83063EA3BF5035UL;
         const int GWL_STYLE = -16;
         const int WS_VISIBLE = 0x10000000;
         const int WS_MINIMIZE = 0x20000000;
@@ -35,7 +33,7 @@ namespace InitialSetup
 
             try
             {
-                StreamWriter blacklistWriter = new StreamWriter("blacklist.dat", false);
+                StreamWriter blacklistWriter = new StreamWriter(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "blacklist.dat", false);
                 // check for each window that is visible and not minimized
                 EnumWindows((hWnd, lParam) =>
                 {
