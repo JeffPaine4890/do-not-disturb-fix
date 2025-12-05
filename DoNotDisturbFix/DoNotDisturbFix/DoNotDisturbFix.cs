@@ -42,7 +42,7 @@ namespace DoNotDisturbFix
 
             try
             {
-                blacklist = File.ReadAllLines(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "blacklist.dat");
+                blacklist = File.ReadAllLines(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\blacklist.dat");
             }
             catch
             {
@@ -164,3 +164,4 @@ namespace DoNotDisturbFix
         }
     }
 }
+
