@@ -33,7 +33,7 @@ namespace InitialSetup
 
             try
             {
-                StreamWriter blacklistWriter = new StreamWriter(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "blacklist.dat", false);
+                StreamWriter blacklistWriter = new StreamWriter(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\blacklist.dat", false);
                 // check for each window that is visible and not minimized
                 EnumWindows((hWnd, lParam) =>
                 {
@@ -65,3 +65,4 @@ namespace InitialSetup
         }
     }
 }
+
