@@ -1,11 +1,10 @@
-﻿using DoNotDisturbFix.Interop;
-using DoNotDisturbFix.Library;
+﻿using DoNotDisturbFix.Library;
 
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -43,7 +42,7 @@ namespace DoNotDisturbFix
 
             try
             {
-                blacklist = File.ReadAllLines("blacklist.dat");
+                blacklist = File.ReadAllLines(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "blacklist.dat");
             }
             catch
             {
