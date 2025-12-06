@@ -93,8 +93,9 @@ namespace DoNotDisturbFix
                 // fullscreen app, then we closed the fullscreen app
                 // In this scenario Do Not Disturb Fix would have reverted to the last known Do Not Disturb state (game) even though the user is no longer playing a game
                 // We also have to check to make sure the foreground window is not the last known game window, because IsUserOnDesktop will return true even in a game
-                else if (currentState.GetState() == DoNotDisturbState.Game && IsUserOnDesktop() && GetForegroundWindow() != lastWindow)
+                else if (currentState.GetState() == DoNotDisturbState.Game && GetForegroundWindow() != lastWindow && IsUserOnDesktop())
                 {
+                    SetDoNotDisturbState(DoNotDisturbState.Off);
                     SetDoNotDisturbState(DoNotDisturbState.Off);
                 }
                 // If we set Do Not Disturb to off, but the user is no longer on the desktop, then that means we should turn Do Not Disturb on due to a fullscreen program
