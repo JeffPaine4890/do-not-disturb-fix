@@ -7,10 +7,9 @@ This program works by detecting when Do Not Disturb is activated due to a fullsc
 
 ## Setup
 1. Download and extract the zip file to the directory of your choosing.
-2. First, you need to run InitialSetup.exe. A message box will pop up instructing you to close or minimize all open windows; once you do that, click OK. The initial setup will keep a record of all the windows that Windows thinks are open and visible on your desktop; these will be added to a blacklist for the main program to ignore when looking for any open windows.
-3. Finally, you can run DoNotDisturbFix.exe. It will silently run in the background and constantly check your Do Not Disturb status.
-4. You'll probably want the main program to run every time you start your computer. The easiest way to set this up is to right-click DoNotDisturbFix.exe, click Show more options (if needed), then click Create shortcut. Cut the shortcut, click on the folder bar in File Explorer, and type in `shell:startup`, then paste the shortcut in that folder.
-5. By default, the program will delay 100 millseconds after every time it checks your Do Not Disturb status. You can modify this by right-clicking the shortcut, clicking Properties, and then in the window that pops up, under Target, at the very end of that text box (after the quotation marks, if they're there), add a space, then your preferred number of milliseconds. You can also type 0 for no delay whatsoever, although this may cause the program to use a lot more CPU for a completely unnoticeable benefit.
+2. You can run DoNotDisturbFix.exe now if you choose. It will silently run in the background and constantly check your Do Not Disturb status.
+3. You'll probably want the main program to run every time you start your computer. The easiest way to set this up is to right-click DoNotDisturbFix.exe, click Show more options (if needed), then click Create shortcut. Cut the shortcut, click on the folder bar in File Explorer, and type in `shell:startup`, then paste the shortcut in that folder.
+4. By default, the program will delay 100 millseconds after every time it checks your Do Not Disturb status. You can modify this by right-clicking the shortcut, clicking Properties, and then in the window that pops up, under Target, at the very end of that text box (after the quotation marks, if they're there), add a space, then your preferred number of milliseconds. You can also type 0 for no delay whatsoever, although this may cause the program to use a lot more CPU for a completely unnoticeable benefit.
 
 ## Disclaimer
 This program relies heavily on undocumented Windows APIs that could potentially break with any Windows update.
