@@ -6,10 +6,9 @@ namespace DoNotDisturbFix.Library
 {
     internal class HexDump
     {
-        public static string Dump(IntPtr pBufferToRead, uint nRange, int nIndentCount)
+        public static string Dump(IntPtr pBufferToRead, uint nRange)
         {
             var hexBuilder = new StringBuilder();
-            IntPtr pBaseAddress = IntPtr.Zero;
 
             for (var idx = 0; idx < nRange; idx++)
             {

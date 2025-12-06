@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -13,42 +12,50 @@ namespace DoNotDisturbFix
 {
     class DoNotDisturbFix
     {
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
 
         const ulong WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED = 0x0D83063EA3BF5035UL;
-        const int GWL_STYLE = -16;
-        const int WS_VISIBLE = 0x10000000;
-        const int WS_MINIMIZE = 0x20000000;
+
+        enum DoNotDisturbController : byte
+        {
+            Windows = 0,
+            Program = 255,
+        }
+
+        class DoNotDisturbState
+        {
+            public const byte Off = 0;
+            public const byte FullscreenApp = 2;
+
+            private byte state = 0;
+            private DoNotDisturbController controller = DoNotDisturbController.Windows;
+
+            public byte GetState()
+            {
+                return state;
+            }
+
+            public void SetState(byte state)
+            {
+                this.state = state;
+            }
+
+            public DoNotDisturbController GetController()
+            {
+                return controller;
+            }
+
+            public void SetController(DoNotDisturbController controller)
+            {
+                this.controller = controller;
+            }
+        }
+
         static void Main(string[] args)
         {
-            // if WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED == 02 00 00 00
-            // and there's no windows open
-            // set it to what it was before
-
-            string lastState = CurrentDoNotDisturbState();
-            string currentState;
-            string[] blacklist;
-
-            try
-            {
-                blacklist = File.ReadAllLines(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\blacklist.dat");
-            }
-            catch
-            {
-                MessageBox.Show("blacklist.dat not found, please run InitialSetup.exe first");
-                return;
-            }
+            DoNotDisturbState lastState = CurrentDoNotDisturbState();
+            DoNotDisturbState currentState;
 
             int delayInMilliseconds = 100;
 
@@ -60,54 +67,23 @@ namespace DoNotDisturbFix
             {
             }
 
-            if (lastState == "02000000")
+            if (lastState.GetState() == DoNotDisturbState.FullscreenApp)
             {
-                lastState = "00000000";
+                lastState.SetState(DoNotDisturbState.Off);
             }
 
             while (true)
             {
                 currentState = CurrentDoNotDisturbState();
-                if (currentState == "02000000")
+                if (currentState.GetState() == DoNotDisturbState.FullscreenApp && IsUserOnDesktop())
                 {
-                    // check for each window that is visible and not minimized
-                    bool revertDoNotDisturb = true;
-                    EnumWindows((hWnd, lParam) =>
-                    {
-                        int windowStatus = GetWindowLong(hWnd, GWL_STYLE);
-                        // check if the window is visible
-                        if ((windowStatus & WS_VISIBLE) == WS_VISIBLE && (windowStatus & WS_MINIMIZE) != WS_MINIMIZE)
-                        {
-                            StringBuilder windowText = new StringBuilder(256);
-                            GetWindowText(hWnd, windowText, windowText.Capacity);
-
-                            uint processId;
-                            GetWindowThreadProcessId(hWnd, out processId);
-                            Console.WriteLine(Process.GetProcessById((int)processId).ProcessName.ToString());
-                            Console.WriteLine(windowText);
-
-                            // Now that we've got the window title and handle, we can check it against our blacklist
-                            // If this window shows up in our blacklist, then we'll pretend it doesn't exist
-                            for (int i = 0; i < blacklist.Length; i += 2)
-                            {
-                                if (blacklist[i] == "ApplicationFrameHost" || blacklist[i] == Process.GetProcessById((int)processId).ProcessName.ToString() && blacklist[i + 1] == windowText.ToString())
-                                {
-                                    return true;
-                                }
-                            }
-
-                            // If we come across a window that's NOT in our blacklist, then we'll assume Do Not Disturb was legitimately activated
-                            revertDoNotDisturb = false;
-                            return false;
-                        }
-                        return true;
-                    }, IntPtr.Zero);
-                    if (revertDoNotDisturb)
-                    {
-                        SetDoNotDisturbState(lastState);
-                    }
+                    SetDoNotDisturbState(lastState.GetState());
                 }
-                else
+                else if (currentState.GetController() == DoNotDisturbController.Program && !IsUserOnDesktop())
+                {
+                    SetDoNotDisturbState(DoNotDisturbState.FullscreenApp);
+                }
+                else if (currentState.GetState() != DoNotDisturbState.FullscreenApp)
                 {
                     lastState = currentState;
                 }
@@ -117,9 +93,24 @@ namespace DoNotDisturbFix
                 }
             }
         }
-
-        static string CurrentDoNotDisturbState()
+        static bool IsUserOnDesktop()
         {
+            Process[] processList = Process.GetProcesses();
+            IntPtr foregroundWindow = GetForegroundWindow();
+            foreach (Process process in processList)
+            {
+                if (process.MainWindowHandle == foregroundWindow)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static DoNotDisturbState CurrentDoNotDisturbState()
+        {
+            DoNotDisturbState returnState = new DoNotDisturbState();
+
             if (Helpers.ReadWnfData(
                 WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED,
                 out int _,
@@ -128,13 +119,14 @@ namespace DoNotDisturbFix
             {
                 if (pInfoBuffer != IntPtr.Zero)
                 {
-                    string currentState = HexDump.Dump(pInfoBuffer, nInfoLength, 0);
+                    string currentState = HexDump.Dump(pInfoBuffer, nInfoLength);
                     Marshal.FreeHGlobal(pInfoBuffer);
-                    return currentState;
+                    returnState.SetState(byte.Parse(currentState.Substring(0, 2), System.Globalization.NumberStyles.HexNumber));
+                    returnState.SetController((DoNotDisturbController)byte.Parse(currentState.Substring(6, 2), System.Globalization.NumberStyles.HexNumber));
                 }
             }
 
-            return "";
+            return returnState;
         }
 
         static byte[] HexStringToBytes(string hexString)
@@ -148,10 +140,12 @@ namespace DoNotDisturbFix
             return returnBytes;
         }
 
-        static void SetDoNotDisturbState(string hexString)
+        static void SetDoNotDisturbState(byte state)
         {
             IntPtr pDataBuffer;
             byte[] dataBytes;
+
+            string hexString = state.ToString("X2") + "0000FF";
 
             dataBytes = HexStringToBytes(hexString);
 
@@ -164,4 +158,3 @@ namespace DoNotDisturbFix
         }
     }
 }
-
