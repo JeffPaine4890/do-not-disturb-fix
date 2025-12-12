@@ -108,10 +108,12 @@ namespace DoNotDisturbFix
                 lastState.SetState(DoNotDisturbState.Off);
             }
 
+            bool delay = delayInMilliseconds > 0;
+
             while (true)
             {
                 currentState = CurrentDoNotDisturbState();
-                desktopState = IsUserOnDesktop(out IntPtr currentWindow);
+                desktopState = IsUserOnDesktop(out IntPtr currentWindow, delay);
                 fullscreenState = IsWindowFullscreen(currentWindow);
 
                 // If Do Not Disturb is set due to a fullscreen app, but the user is on the desktop, revert to the last known Do Not Disturb state
@@ -150,13 +152,13 @@ namespace DoNotDisturbFix
                 {
                     SetDoNotDisturbState(DoNotDisturbState.Off);
                 }
-                if (delayInMilliseconds > 0)
+                if (delay)
                 {
                     Thread.Sleep(delayInMilliseconds);
                 }
             }
         }
-        static bool IsUserOnDesktop(out IntPtr foregroundWindow)
+        static bool IsUserOnDesktop(out IntPtr foregroundWindow, bool delay)
         {
             while (true)
             {
@@ -165,14 +167,20 @@ namespace DoNotDisturbFix
 
                 if (foregroundWindow == IntPtr.Zero)
                 {
-                    Thread.Sleep(1);
+                    if (delay)
+                    {
+                        Thread.Sleep(1);
+                    }
                     continue;
                 }
 
                 GetWindowThreadProcessId(foregroundWindow, out uint processId);
                 if (processId == 0)
                 {
-                    Thread.Sleep(1);
+                    if (delay)
+                    {
+                        Thread.Sleep(1);
+                    }
                     continue;
                 }
 
@@ -181,6 +189,11 @@ namespace DoNotDisturbFix
                     if (process.MainWindowHandle == foregroundWindow)
                     {
                         return false;
+                    }
+                    // Adding this sleep here GREATLY reduces CPU usage
+                    if (delay)
+                    {
+                        Thread.Sleep(1);
                     }
                 }
 
