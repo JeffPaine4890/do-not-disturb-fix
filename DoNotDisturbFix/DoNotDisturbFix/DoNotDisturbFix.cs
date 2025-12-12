@@ -4,7 +4,6 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Xml.Linq;
 
 namespace DoNotDisturbFix
 {
@@ -66,7 +65,7 @@ namespace DoNotDisturbFix
             Process[] currentProcessList = null;
             bool desktopState = false;
 
-            int delayInMilliseconds = 100;
+            int delayInMilliseconds = 1;
 
             try
             {
