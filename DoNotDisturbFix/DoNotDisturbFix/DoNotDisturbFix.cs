@@ -12,6 +12,9 @@ namespace DoNotDisturbFix
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
         const ulong WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED = 0x0D83063EA3BF5035UL;
 
         // This is not a Windows property, rather we're taking advantage of the fact that only the first byte of the WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED property actually controls anything
@@ -57,7 +60,7 @@ namespace DoNotDisturbFix
             DoNotDisturbState lastState = CurrentDoNotDisturbState();
             DoNotDisturbState currentState;
 
-            IntPtr lastWindow = IntPtr.Zero;
+            IntPtr lastGameWindow = IntPtr.Zero;
 
             int delayInMilliseconds = 100;
 
@@ -86,16 +89,15 @@ namespace DoNotDisturbFix
                 // If Windows switched to Do Not Disturb mode due to a game, we need to keep track of the window handle that last triggered that
                 else if (currentState.GetState() == DoNotDisturbState.Game && currentState.GetController() == DoNotDisturbController.Windows)
                 {
-                    lastWindow = GetForegroundWindow();
+                    lastGameWindow = GetForegroundWindow();
                 }
                 // If Do Not Disturb is set due to a game, but the user is on the desktop, turn Do Not Disturb off
                 // The main reason this would happen is if the user was playing a game, then switched to a fullscreen app, the game closed while the user was using the
                 // fullscreen app, then we closed the fullscreen app
                 // In this scenario Do Not Disturb Fix would have reverted to the last known Do Not Disturb state (game) even though the user is no longer playing a game
                 // We also have to check to make sure the foreground window is not the last known game window, because IsUserOnDesktop will return true even in a game
-                else if (currentState.GetState() == DoNotDisturbState.Game && GetForegroundWindow() != lastWindow && IsUserOnDesktop())
+                else if (currentState.GetState() == DoNotDisturbState.Game && GetForegroundWindow() != lastGameWindow && IsUserOnDesktop())
                 {
-                    SetDoNotDisturbState(DoNotDisturbState.Off);
                     SetDoNotDisturbState(DoNotDisturbState.Off);
                 }
                 // If we set Do Not Disturb to off, but the user is no longer on the desktop, then that means we should turn Do Not Disturb on due to a fullscreen program
@@ -117,17 +119,34 @@ namespace DoNotDisturbFix
         }
         static bool IsUserOnDesktop()
         {
-            Process[] processList = Process.GetProcesses();
-            IntPtr foregroundWindow = GetForegroundWindow();
-
-            foreach (Process process in processList)
+            while (true)
             {
-                if (process.MainWindowHandle == foregroundWindow)
+                Process[] processList = Process.GetProcesses();
+                IntPtr foregroundWindow = GetForegroundWindow();
+
+                if (foregroundWindow == IntPtr.Zero)
                 {
-                    return false;
+                    Thread.Sleep(1);
+                    continue;
                 }
+
+                GetWindowThreadProcessId(foregroundWindow, out uint processId);
+                if (processId == 0)
+                {
+                    Thread.Sleep(1);
+                    continue;
+                }
+
+                foreach (Process process in processList)
+                {
+                    if (process.MainWindowHandle == foregroundWindow)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             }
-            return true;
         }
 
         static DoNotDisturbState CurrentDoNotDisturbState()
