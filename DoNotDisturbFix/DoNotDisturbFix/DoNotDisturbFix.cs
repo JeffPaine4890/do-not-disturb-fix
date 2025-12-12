@@ -93,7 +93,7 @@ namespace DoNotDisturbFix
             bool desktopState;
             bool fullscreenState;
 
-            int delayInMilliseconds = 1;
+            int delayInMilliseconds = 100;
 
             try
             {
@@ -189,11 +189,6 @@ namespace DoNotDisturbFix
                     if (process.MainWindowHandle == foregroundWindow)
                     {
                         return false;
-                    }
-                    // Adding this sleep here GREATLY reduces CPU usage
-                    if (delay)
-                    {
-                        Thread.Sleep(1);
                     }
                 }
 
