@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Xml.Linq;
 
 namespace DoNotDisturbFix
 {
@@ -60,7 +61,10 @@ namespace DoNotDisturbFix
             DoNotDisturbState lastState = CurrentDoNotDisturbState();
             DoNotDisturbState currentState;
 
+            IntPtr currentWindow = IntPtr.Zero;
             IntPtr lastGameWindow = IntPtr.Zero;
+            Process[] currentProcessList = null;
+            bool desktopState = false;
 
             int delayInMilliseconds = 100;
 
@@ -80,9 +84,10 @@ namespace DoNotDisturbFix
             while (true)
             {
                 currentState = CurrentDoNotDisturbState();
+                desktopState = IsUserOnDesktop(out currentProcessList, out currentWindow);
 
                 // If Do Not Disturb is set due to a fullscreen app, but the user is on the desktop, revert to the last known Do Not Disturb state
-                if (currentState.GetState() == DoNotDisturbState.FullscreenApp && IsUserOnDesktop())
+                if (currentState.GetState() == DoNotDisturbState.FullscreenApp && desktopState)
                 {
                     SetDoNotDisturbState(lastState.GetState());
                 }
@@ -96,14 +101,14 @@ namespace DoNotDisturbFix
                 // fullscreen app, then we closed the fullscreen app
                 // In this scenario Do Not Disturb Fix would have reverted to the last known Do Not Disturb state (game) even though the user is no longer playing a game
                 // We also have to check to make sure the foreground window is not the last known game window, because IsUserOnDesktop will return true even in a game
-                else if (currentState.GetState() == DoNotDisturbState.Game && GetForegroundWindow() != lastGameWindow && IsUserOnDesktop())
+                else if (currentState.GetState() == DoNotDisturbState.Game && currentWindow != lastGameWindow && desktopState)
                 {
                     SetDoNotDisturbState(DoNotDisturbState.Off);
                 }
                 // If we set Do Not Disturb to off, but the user is no longer on the desktop, then that means we should turn Do Not Disturb on due to a fullscreen program
                 // This covers cases such as opening the NVIDIA Overlay; this is supposed to be considered a fullscreen app but since it's not actually a new window,
                 // Windows won't set Do Not Disturb mode again assuming it's already been set
-                else if (currentState.GetState() == DoNotDisturbState.Off && currentState.GetController() == DoNotDisturbController.Program && !IsUserOnDesktop())
+                else if (currentState.GetState() == DoNotDisturbState.Off && currentState.GetController() == DoNotDisturbController.Program && !desktopState)
                 {
                     SetDoNotDisturbState(DoNotDisturbState.FullscreenApp);
                 }
@@ -117,12 +122,12 @@ namespace DoNotDisturbFix
                 }
             }
         }
-        static bool IsUserOnDesktop()
+        static bool IsUserOnDesktop(out Process[] processList, out IntPtr foregroundWindow)
         {
             while (true)
             {
-                Process[] processList = Process.GetProcesses();
-                IntPtr foregroundWindow = GetForegroundWindow();
+                processList = Process.GetProcesses();
+                foregroundWindow = GetForegroundWindow();
 
                 if (foregroundWindow == IntPtr.Zero)
                 {
