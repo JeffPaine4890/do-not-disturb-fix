@@ -93,7 +93,7 @@ namespace DoNotDisturbFix
             bool desktopState;
             bool fullscreenState;
 
-            int delayInMilliseconds = 100;
+            int delayInMilliseconds = 1;
 
             try
             {
@@ -162,7 +162,6 @@ namespace DoNotDisturbFix
         {
             while (true)
             {
-                Process[] processList = Process.GetProcesses();
                 foregroundWindow = GetForegroundWindow();
 
                 if (foregroundWindow == IntPtr.Zero)
@@ -184,15 +183,7 @@ namespace DoNotDisturbFix
                     continue;
                 }
 
-                foreach (Process process in processList)
-                {
-                    if (process.MainWindowHandle == foregroundWindow)
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
+                return !(Process.GetProcessById((int)processId).MainWindowHandle == foregroundWindow);
             }
         }
 
