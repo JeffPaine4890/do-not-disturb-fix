@@ -4,18 +4,47 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows.Forms;
 
 namespace DoNotDisturbFix
 {
     class DoNotDisturbFix
     {
+        [StructLayout(LayoutKind.Sequential)]
+        public struct Rect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        internal struct MonitorInfo
+        {
+            public int cbSize;
+            public Rect rcMonitor;
+            public Rect rcWork;
+            public UInt32 dwFlags;
+        }
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        internal static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromWindow(IntPtr hWnd, int dwFlags);
+
         const ulong WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED = 0x0D83063EA3BF5035UL;
+        const int MONITOR_DEFAULTTOPRIMARY = 1;
 
         // This is not a Windows property, rather we're taking advantage of the fact that only the first byte of the WNF_SHEL_QUIET_MOMENT_SHELL_MODE_CHANGED property actually controls anything
         // So if we set the last byte to 0xFF (which Windows will change back to 0x00 whenever it changes the property), we can keep track of who changed the property, us or Windows
@@ -60,10 +89,9 @@ namespace DoNotDisturbFix
             DoNotDisturbState lastState = CurrentDoNotDisturbState();
             DoNotDisturbState currentState;
 
-            IntPtr currentWindow = IntPtr.Zero;
             IntPtr lastGameWindow = IntPtr.Zero;
-            Process[] currentProcessList = null;
-            bool desktopState = false;
+            bool desktopState;
+            bool fullscreenState;
 
             int delayInMilliseconds = 1;
 
@@ -83,7 +111,8 @@ namespace DoNotDisturbFix
             while (true)
             {
                 currentState = CurrentDoNotDisturbState();
-                desktopState = IsUserOnDesktop(out currentProcessList, out currentWindow);
+                desktopState = IsUserOnDesktop(out IntPtr currentWindow);
+                fullscreenState = IsWindowFullscreen(currentWindow);
 
                 // If Do Not Disturb is set due to a fullscreen app, but the user is on the desktop, revert to the last known Do Not Disturb state
                 if (currentState.GetState() == DoNotDisturbState.FullscreenApp && desktopState)
@@ -107,7 +136,7 @@ namespace DoNotDisturbFix
                 // If we set Do Not Disturb to off, but the user is no longer on the desktop, then that means we should turn Do Not Disturb on due to a fullscreen program
                 // This covers cases such as opening the NVIDIA Overlay; this is supposed to be considered a fullscreen app but since it's not actually a new window,
                 // Windows won't set Do Not Disturb mode again assuming it's already been set
-                else if (currentState.GetState() == DoNotDisturbState.Off && currentState.GetController() == DoNotDisturbController.Program && !desktopState)
+                else if (currentState.GetState() == DoNotDisturbState.Off && currentState.GetController() == DoNotDisturbController.Program && !desktopState && fullscreenState)
                 {
                     SetDoNotDisturbState(DoNotDisturbState.FullscreenApp);
                 }
@@ -115,17 +144,23 @@ namespace DoNotDisturbFix
                 {
                     lastState = currentState;
                 }
+                // In some scenarios this program will set Do Not Disturb mode to fullscreen when we switch from the desktop to an app that's not actually fullscreen
+                // Maybe this is a race condition issue? In any case we'll get around this by doing an additional check to make sure the foreground window is actually fullscreen
+                if (currentState.GetState() == DoNotDisturbState.FullscreenApp && currentState.GetController() == DoNotDisturbController.Program && !fullscreenState)
+                {
+                    SetDoNotDisturbState(DoNotDisturbState.Off);
+                }
                 if (delayInMilliseconds > 0)
                 {
                     Thread.Sleep(delayInMilliseconds);
                 }
             }
         }
-        static bool IsUserOnDesktop(out Process[] processList, out IntPtr foregroundWindow)
+        static bool IsUserOnDesktop(out IntPtr foregroundWindow)
         {
             while (true)
             {
-                processList = Process.GetProcesses();
+                Process[] processList = Process.GetProcesses();
                 foregroundWindow = GetForegroundWindow();
 
                 if (foregroundWindow == IntPtr.Zero)
@@ -151,6 +186,26 @@ namespace DoNotDisturbFix
 
                 return true;
             }
+        }
+
+        static bool IsWindowFullscreen(IntPtr windowHandle)
+        {
+            MonitorInfo monitorInfo = new MonitorInfo();
+            monitorInfo.cbSize = Marshal.SizeOf(typeof(MonitorInfo));
+            if (!GetWindowRect(windowHandle, out Rect windowBounds))
+            {
+                return false;
+            }
+            Screen.FromHandle(windowHandle);
+            GetMonitorInfo(MonitorFromWindow(windowHandle, MONITOR_DEFAULTTOPRIMARY), ref monitorInfo);
+            if (windowBounds.Left == monitorInfo.rcMonitor.Left &&
+                windowBounds.Top == monitorInfo.rcMonitor.Top &&
+                windowBounds.Right == monitorInfo.rcMonitor.Right &&
+                windowBounds.Bottom == monitorInfo.rcMonitor.Bottom)
+            {
+                return true;
+            }
+            return false;
         }
 
         static DoNotDisturbState CurrentDoNotDisturbState()
